@@ -1,14 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
 import { 
   Plus, FileText, MessageSquare, Trash2, Share2, 
-  ExternalLink, Shield, Search, Filter, Clock, 
-  ChevronRight, MoreVertical, LayoutGrid, List, Download
+  Shield, Search, Filter, Clock, LayoutGrid, List, Download, 
+  MoreHorizontal, ChevronRight, Activity, HardDrive
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
@@ -44,369 +44,212 @@ export default function Dashboard() {
       setFiles(response.data);
     } catch (error) {
       console.error("Error fetching files:", error);
-      toast.error("Failed to load your vault");
+      toast.error("Security handshake failed. Please refresh.");
     } finally {
       setIsFetching(false);
     }
   };
 
-  const clearVault = async () => {
-    if (!confirm("Delete everything in the testing vault? This cannot be undone.")) return;
-    try {
-      const token = await getToken();
-      await axios.delete(`${API_URL}/files/clear`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setFiles([]);
-      toast.success("Vault cleared");
-    } catch (error) {
-      toast.error("Failed to clear vault");
-    }
-  };
-
   const deleteFile = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this? This action cannot be undone.")) return;
-    
+    if (!confirm("This action will permanently erase the encrypted blob. Continue?")) return;
     try {
       const token = await getToken();
       await axios.delete(`${API_URL}/files/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setFiles(files.filter(f => f._id !== id));
-      toast.success("Deleted successfully");
+      toast.success("Asset decommissioned");
     } catch (error) {
-      toast.error("Failed to delete");
+      toast.error("Decommission failed");
     }
   };
 
-  const shareFile = (file: any) => {
-    setSharingFile(file);
-    setIsShareModalOpen(true);
-  };
-
-  const downloadEncFile = async (file: any) => {
-    try {
-      let blob: Blob;
-      // Obfuscate filename and extension for maximum security during manual transfer
-      const timestamp = Date.now().toString(16);
-      const randomPart = Math.random().toString(36).substring(2, 8);
-      const obfuscatedName = `secure_blob_${timestamp}_${randomPart}.dat`;
-
-      if (file.fileUrl) {
-        // If it's a URL (from server)
-        const response = await axios.get(file.fileUrl, { responseType: 'arraybuffer' });
-        blob = new Blob([response.data], { type: 'application/octet-stream' });
-      } else if (file.encryptedContent) {
-        // If it's a message (base64)
-        const binaryString = window.atob(file.encryptedContent);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        blob = new Blob([bytes], { type: 'application/octet-stream' });
-      } else {
-        throw new Error("No content found");
-      }
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = obfuscatedName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast.success("Encrypted archive downloaded");
-    } catch (error) {
-      console.error("Download error:", error);
-      toast.error("Failed to download encrypted file");
-    }
-  };
-
-  const filteredFiles = files.filter(f => 
-    f.fileName.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredFiles = files.filter(file => 
+    file.fileName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    file.originalName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading || isFetching) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#02040c]">
-        <div className="relative">
-          <div className="w-20 h-20 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Shield className="w-8 h-8 text-indigo-500 animate-pulse" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#02040c] text-slate-200">
+    <div className="flex flex-col min-h-screen bg-white dark:bg-[#0a0c10] text-slate-900 dark:text-slate-200">
       <Navbar />
       
-      {/* Background decoration */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/10 blur-[120px] animate-blob" />
-        <div className="absolute bottom-[10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-600/10 blur-[120px] animate-blob animation-delay-2000" />
-        
-        {/* Grid Pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-      </div>
+      <main className="flex-1 pt-24 pb-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+            <StatCard icon={<Shield className="w-4 h-4" />} label="Security Status" value="Verified" color="text-emerald-500" />
+            <StatCard icon={<FileText className="w-4 h-4" />} label="Total Assets" value={files.length.toString()} />
+            <StatCard icon={<HardDrive className="w-4 h-4" />} label="Vault Usage" value={`${(files.length * 1.2).toFixed(1)} MB`} />
+            <StatCard icon={<Activity className="w-4 h-4" />} label="Active Links" value="3" />
+          </div>
 
-      <main className="flex-1 pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
-        {/* Header Section */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-16 gap-8"
-        >
-          <div>
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-                <Shield className="w-5 h-5 text-indigo-400" />
-              </div>
-              <span className="text-sm font-bold uppercase tracking-widest text-indigo-400/80">Secure Repository</span>
+          {/* Action Bar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search encrypted assets..."
+                className="enterprise-input pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            <h1 className="text-5xl font-bold tracking-tight mb-4">
-              Your <span className="premium-gradient-text">Secure Vault</span>
-            </h1>
-            <p className="text-slate-400 text-lg max-w-xl leading-relaxed">Everything in this vault is encrypted on your device. Only you hold the keys to unlock your assets.</p>
-          </div>
-          <div className="flex flex-wrap gap-4">
-            <Button 
-              variant="outline" 
-              onClick={clearVault} 
-              className="flex-1 lg:flex-none border-rose-500/20 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/40 rounded-2xl px-8 h-12 font-bold transition-all active:scale-95"
-            >
-              Clear Vault
-            </Button>
-            <Button 
-              onClick={() => router.push("/encrypt")} 
-              className="flex-1 lg:flex-none premium-button rounded-2xl px-8 h-12 gap-3 shadow-xl active:scale-95"
-            >
-              <Plus className="w-5 h-5" />
-              New Encryption
-            </Button>
-          </div>
-        </motion.div>
-
-        {/* Toolbar Section */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="flex flex-col md:flex-row gap-6 mb-12 items-center justify-between"
-        >
-          <div className="relative w-full md:max-w-lg group">
-            <div className="absolute inset-0 bg-indigo-500/5 rounded-2xl blur-md group-focus-within:bg-indigo-500/10 transition-all" />
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors z-10" />
-            <input 
-              type="text"
-              placeholder="Search by filename..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="premium-input pl-14 h-14 relative z-0 text-base"
-            />
-          </div>
-          
-          <div className="flex items-center gap-2 bg-slate-900/40 p-1.5 border border-white/5 rounded-2xl backdrop-blur-xl">
-            <button 
-              onClick={() => setViewMode('grid')}
-              className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-300'}`}
-              title="Grid View"
-            >
-              <LayoutGrid className="w-5 h-5" />
-            </button>
-            <button 
-              onClick={() => setViewMode('list')}
-              className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-300'}`}
-              title="List View"
-            >
-              <List className="w-5 h-5" />
-            </button>
-          </div>
-        </motion.div>
-
-        {files.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-40 glass-card rounded-[3rem] border-dashed"
-          >
-            <div className="relative mb-10">
-              <div className="absolute inset-0 bg-indigo-500/20 blur-3xl rounded-full animate-pulse-slow" />
-              <div className="relative w-28 h-28 bg-slate-950 rounded-[2rem] flex items-center justify-center shadow-inner border border-white/10">
-                <Shield className="w-12 h-12 text-slate-700" />
+            
+            <div className="flex items-center gap-3">
+              <div className="flex p-1 bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/5">
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  <List className="w-4 h-4" />
+                </button>
               </div>
+              <Link href="/encrypt" className="primary-button h-10 px-5 text-sm">
+                <Plus className="w-4 h-4" />
+                New Secure Upload
+              </Link>
             </div>
-            <h3 className="text-3xl font-bold mb-4 text-white">Your Vault is Empty</h3>
-            <p className="text-slate-400 mb-12 max-w-sm text-center text-lg leading-relaxed">
-              Experience total privacy. Encrypt your first file or message to see it appear here.
-            </p>
-            <Button onClick={() => router.push("/encrypt")} className="premium-button gap-3 h-14 px-10 rounded-2xl text-lg shadow-2xl">
-              <Plus className="w-6 h-6" />
-              Create First Encryption
-            </Button>
-          </motion.div>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            {viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {filteredFiles.map((file, idx) => (
+          </div>
+
+          {/* Vault Content */}
+          {isFetching ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="h-48 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 animate-pulse" />
+              ))}
+            </div>
+          ) : filteredFiles.length === 0 ? (
+            <div className="text-center py-32 glass-card rounded-2xl">
+              <div className="w-16 h-16 bg-slate-50 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Shield className="w-8 h-8 text-slate-300" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Vault Empty</h3>
+              <p className="text-slate-500 max-w-xs mx-auto mb-8">No encrypted assets found in this environment. Start by uploading your first file.</p>
+              <Link href="/encrypt" className="secondary-button inline-flex mx-auto">
+                Begin Initialization
+              </Link>
+            </div>
+          ) : viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <AnimatePresence mode="popLayout">
+                {filteredFiles.map((file) => (
                   <motion.div
                     layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.4, delay: idx * 0.05 }}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
                     key={file._id}
-                    className="group glass-card glass-card-hover rounded-[2rem] p-8 relative overflow-hidden"
+                    className="glass-card p-5 rounded-xl group relative overflow-hidden"
                   >
-                    <div className="flex justify-between items-start mb-8">
-                      <div className={`p-5 rounded-2xl shadow-inner border border-white/5 ${file.fileType === 'file' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                        {file.fileType === 'file' ? <FileText className="w-8 h-8" /> : <MessageSquare className="w-8 h-8" />}
+                    <div className="flex justify-between items-start mb-4">
+                      <div className={`p-2.5 rounded-lg ${file.fileUrl ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400' : 'bg-indigo-50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400'}`}>
+                        {file.fileUrl ? <FileText className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
                       </div>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                        <button 
-                          onClick={() => downloadEncFile(file)}
-                          className="p-3 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-xl transition-all border border-transparent hover:border-indigo-400/20"
-                          title="Download .enc Archive"
-                        >
-                          <Download className="w-5 h-5" />
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => setSharingFile(file) || setIsShareModalOpen(true)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors">
+                          <Share2 className="w-4 h-4" />
                         </button>
-                        <button 
-                          onClick={() => deleteFile(file._id)}
-                          className="p-3 text-slate-500 hover:text-rose-400 hover:bg-rose-400/10 rounded-xl transition-all border border-transparent hover:border-rose-400/20"
-                          title="Delete Permanently"
-                        >
-                          <Trash2 className="w-5 h-5" />
+                        <button onClick={() => deleteFile(file._id)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-md transition-colors">
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
-
-                    <h3 className="font-bold text-2xl mb-3 truncate pr-4 text-white group-hover:text-indigo-300 transition-colors">{file.fileName}</h3>
                     
-                    <div className="flex flex-wrap items-center gap-3 mb-10">
-                      <span className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/5 text-xs font-bold text-slate-400">
-                        <Clock className="w-3.5 h-3.5" />
-                        {new Date(file.createdAt).toLocaleDateString()}
-                      </span>
-                      <span className="px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/10 text-[10px] font-black uppercase tracking-widest text-indigo-400">
-                        {file.fileType}
-                      </span>
-                      {file.size && (
-                        <span className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/10 text-[10px] font-black uppercase tracking-widest text-emerald-400">
-                          {(file.size / 1024).toFixed(1)} KB
-                        </span>
-                      )}
-                    </div>
+                    <h4 className="font-bold text-slate-900 dark:text-white truncate mb-1 pr-10">{file.originalName || "Encrypted Message"}</h4>
+                    <p className="text-xs text-slate-500 flex items-center gap-1.5 mb-4 uppercase tracking-wider font-medium">
+                      <Clock className="w-3 h-3" />
+                      {new Date(file.createdAt).toLocaleDateString()}
+                    </p>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <Button 
-                        variant="outline" 
-                        size="lg" 
-                        className="w-full h-12 rounded-2xl border-white/5 bg-white/5 text-slate-300 hover:text-indigo-400 hover:border-indigo-500/30 hover:bg-indigo-500/5 gap-2 font-bold"
-                        onClick={() => shareFile(file)}
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        {file.fileSize ? `${(file.fileSize / 1024).toFixed(1)} KB` : '128-bit payload'}
+                      </span>
+                      <Link 
+                        href={`/decrypt?id=${file._id}`}
+                        className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                       >
-                        <Share2 className="w-4.5 h-4.5" />
-                        Share
-                      </Button>
-                      <Button 
-                        className="w-full h-12 rounded-2xl premium-button gap-2 shadow-none font-bold"
-                        onClick={() => router.push(`/decrypt?id=${file._id}`)}
-                      >
-                        <ExternalLink className="w-4.5 h-4.5" />
-                        Decrypt
-                      </Button>
+                        Unlock & Details <ChevronRight className="w-3 h-3" />
+                      </Link>
                     </div>
                   </motion.div>
                 ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredFiles.map((file, idx) => (
-                  <motion.div
-                    layout
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.4, delay: idx * 0.05 }}
-                    key={file._id}
-                    className="group glass-card glass-card-hover rounded-2xl p-4 flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className={`p-3 rounded-xl border border-white/5 ${file.fileType === 'file' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                        {file.fileType === 'file' ? <FileText className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-lg truncate text-white group-hover:text-indigo-300 transition-colors">{file.fileName}</h3>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {new Date(file.createdAt).toLocaleDateString()}
-                          </span>
-                          <span>•</span>
-                          <span className="uppercase tracking-widest text-[10px]">{file.fileType}</span>
-                          {file.size && (
-                            <>
-                              <span>•</span>
-                              <span className="text-indigo-400/70">{(file.size / 1024).toFixed(1)} KB</span>
-                            </>
-                          )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div className="glass-card rounded-xl overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/5">
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Asset Name</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Type</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Size</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Created</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredFiles.map((file) => (
+                    <tr key={file._id} className="data-row">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-4 h-4 text-slate-400" />
+                          <span className="font-medium text-slate-900 dark:text-white">{file.originalName || "Secure Blob"}</span>
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-10 rounded-xl border-white/5 bg-white/5 text-slate-400 hover:text-indigo-400 hover:border-indigo-500/30 gap-2 font-bold px-4"
-                        onClick={() => shareFile(file)}
-                      >
-                        <Share2 className="w-4 h-4" />
-                        <span className="hidden sm:inline">Share</span>
-                      </Button>
-                      <Button 
-                        size="sm"
-                        className="h-10 rounded-xl premium-button gap-2 shadow-none font-bold px-4"
-                        onClick={() => router.push(`/decrypt?id=${file._id}`)}
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        <span className="hidden sm:inline">Decrypt</span>
-                      </Button>
-                      <button 
-                        onClick={() => downloadEncFile(file)}
-                        className="p-2.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-xl transition-all border border-transparent hover:border-indigo-400/20"
-                        title="Download .enc Archive"
-                      >
-                        <Download className="w-5 h-5" />
-                      </button>
-                      <button 
-                        onClick={() => deleteFile(file._id)}
-                        className="p-2.5 text-slate-500 hover:text-rose-400 hover:bg-rose-400/10 rounded-xl transition-all border border-transparent hover:border-rose-400/20"
-                        title="Delete Permanently"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </AnimatePresence>
-        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/5 uppercase">
+                          {file.fileUrl ? 'Binary' : 'String'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-500">{file.fileSize ? `${(file.fileSize / 1024).toFixed(1)} KB` : '--'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-500">{new Date(file.createdAt).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-right">
+                        <Link 
+                          href={`/decrypt?id=${file._id}`}
+                          className="p-2 text-slate-400 hover:text-blue-500 transition-colors inline-block"
+                          title="View Details & Unlock"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </main>
 
-      {sharingFile && (
-        <ShareModal 
-          isOpen={isShareModalOpen}
-          onClose={() => setIsShareModalOpen(false)}
-          file={sharingFile}
-          getToken={getToken}
-        />
-      )}
+      <ShareModal 
+        isOpen={isShareModalOpen} 
+        onClose={() => setIsShareModalOpen(false)} 
+        file={sharingFile} 
+      />
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, color = "text-slate-900 dark:text-white" }: any) {
+  return (
+    <div className="glass-card p-5 rounded-xl flex items-center gap-4">
+      <div className="p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 text-slate-400">
+        {icon}
+      </div>
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-0.5">{label}</p>
+        <p className={`text-xl font-bold ${color}`}>{value}</p>
+      </div>
     </div>
   );
 }

@@ -575,88 +575,87 @@ export default function DecryptPage() {
                         </div>
 
                         {manualType === 'message' ? (
-                          <div className="space-y-3">
-                            <label className="text-sm font-bold text-slate-400 uppercase tracking-widest px-1">Encrypted Payload</label>
+                          <div className="space-y-4">
+                            <label className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Encrypted Ciphertext</label>
                             <textarea
                               value={manualContent}
                               onChange={(e) => setManualContent(e.target.value)}
                               placeholder="Paste the encrypted base64 payload here..."
-                              className="premium-input h-32 resize-none font-mono text-xs leading-relaxed"
+                              className="enterprise-input min-h-[200px] resize-none font-mono text-sm leading-relaxed"
                             />
                           </div>
                         ) : (
-                          <div className="space-y-3">
-                            <label className="text-sm font-bold text-slate-400 uppercase tracking-widest px-1">Source Archive (.enc)</label>
+                          <div className="space-y-4">
+                            <label className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Encrypted Archive (.enc)</label>
                             <div 
                               onClick={() => fileInputRef.current?.click()}
-                              className="group border-2 border-dashed border-slate-800 rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all relative overflow-hidden"
+                              className="group border-2 border-dashed border-white/10 rounded-2xl p-16 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/40 hover:bg-blue-500/5 transition-all relative overflow-hidden"
                             >
-                              <div className="absolute inset-0 bg-shimmer opacity-0 group-hover:opacity-100 transition-opacity" />
                               <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => setManualFile(e.target.files?.[0] || null)} />
                               {manualFile ? (
                                 <div className="flex flex-col items-center">
-                                  <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center mb-3">
-                                    <FileText className="w-6 h-6" />
+                                  <div className="w-20 h-20 bg-blue-600/10 text-blue-400 rounded-3xl flex items-center justify-center mb-6 border border-blue-600/20 shadow-lg shadow-blue-900/20">
+                                    <FileText className="w-10 h-10" />
                                   </div>
-                                  <div className="text-indigo-400 font-bold">{manualFile.name}</div>
-                                  <div className="text-slate-500 text-xs mt-1">{(manualFile.size / 1024).toFixed(1)} KB ready</div>
+                                  <div className="text-white font-bold text-xl mb-1">{manualFile.name}</div>
+                                  <div className="text-slate-500 text-xs uppercase tracking-widest font-black">{(manualFile.size / 1024).toFixed(1)} KB ARCHIVE</div>
                                 </div>
                               ) : (
                                 <>
-                                  <div className="w-12 h-12 bg-slate-900 text-slate-500 rounded-xl flex items-center justify-center mb-4 group-hover:text-indigo-400 transition-colors">
-                                    <Upload className="w-6 h-6" />
+                                  <div className="w-16 h-16 bg-white/5 text-slate-600 rounded-2xl flex items-center justify-center mb-6 group-hover:text-blue-400 transition-colors border border-white/10">
+                                    <Upload className="w-8 h-8" />
                                   </div>
-                                  <span className="text-slate-300 font-semibold">Drop archive here</span>
-                                  <span className="text-slate-500 text-sm mt-1">or click to browse local storage</span>
+                                  <span className="text-slate-300 font-bold text-lg">Load Encrypted Asset</span>
+                                  <span className="text-slate-500 text-sm mt-2">Select from local terminal or drag-and-drop</span>
                                 </>
                               )}
                             </div>
                           </div>
                         )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-2 gap-6 items-end">
                           <div className="space-y-3">
-                            <label className="text-sm font-bold text-slate-400 uppercase tracking-widest px-1">Salt ID</label>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 block whitespace-nowrap">Encryption Salt</label>
                             <input
                               type="text"
                               value={manualSalt}
                               onChange={(e) => setManualSalt(e.target.value)}
-                              placeholder="Encryption Salt (Hex)"
-                              className="premium-input font-mono text-xs"
+                              placeholder="7f3a2b..."
+                              className="enterprise-input font-mono text-sm tracking-widest"
                             />
                           </div>
                           <div className="space-y-3">
-                            <label className="text-sm font-bold text-slate-400 uppercase tracking-widest px-1">IV Tag</label>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 block whitespace-nowrap">Initialization Vector</label>
                             <input
                               type="text"
                               value={manualIv}
                               onChange={(e) => setManualIv(e.target.value)}
-                              placeholder="Init Vector (Hex)"
-                              className="premium-input font-mono text-xs"
+                              placeholder="a1b2c3..."
+                              className="enterprise-input font-mono text-sm tracking-widest"
                             />
                           </div>
                         </div>
                       </div>
                     )}
 
-                    <form onSubmit={handleDecrypt} className="mt-10 pt-10 border-t border-slate-800/50 space-y-8">
-                      <div className="space-y-3">
-                        <label className="text-sm font-bold text-slate-400 uppercase tracking-widest px-1">Master Password</label>
+                    <form onSubmit={handleDecrypt} className="mt-12 pt-12 border-t border-white/5 space-y-10">
+                      <div className="space-y-4">
+                        <label className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Master Authentication Key</label>
                         <div className="relative group">
-                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-600 group-focus-within:text-indigo-400 transition-colors">
+                          <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-blue-500 transition-colors">
                             <Lock className="w-5 h-5" />
                           </div>
                           <input
                             type={showPassword ? "text" : "password"}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter the password used to encrypt this data"
-                            className="premium-input pl-12 pr-12"
+                            placeholder="Enter the secret key used during asset encryption"
+                            className="enterprise-input pl-14 pr-14 py-4 text-lg"
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-600 hover:text-slate-300 transition-colors"
+                            className="absolute inset-y-0 right-0 pr-5 flex items-center text-slate-500 hover:text-white transition-all"
                           >
                             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                           </button>

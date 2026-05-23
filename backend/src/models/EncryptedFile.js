@@ -10,6 +10,9 @@ const encryptedFileSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  originalName: {
+    type: String,
+  },
   fileType: {
     type: String, // 'file' or 'message'
     required: true,

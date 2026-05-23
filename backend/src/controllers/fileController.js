@@ -9,41 +9,50 @@ let mockFiles = [];
 const uploadFile = async (req, res) => {
   try {
     const { fileName, fileType, encryptedContent, iv, salt, mimeType, size } = req.body;
-
+    
     if (!iv || !salt) {
       return res.status(400).json({ message: 'Missing encryption metadata' });
     }
 
     let fileUrl = '';
 
-    if (fileType === 'file' && req.file) {
-      // Cloudinary upload logic would go here if we're sending file directly
-      // However, the requirement says encrypt on client side.
-      // So we'll receive the encrypted blob/buffer.
-      const result = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { resource_type: 'auto', folder: 'ciphervault' },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        uploadStream.end(req.file.buffer);
-      });
-      fileUrl = result.secure_url;
+    if (fileType === 'file') {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file buffer received' });
+      }
+
+      try {
+        const result = await new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            { resource_type: 'auto', folder: 'ciphervault' },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          uploadStream.end(req.file.buffer);
+        });
+        fileUrl = result.secure_url;
+      } catch (cloudinaryError) {
+        console.error('Cloudinary error:', cloudinaryError);
+        return res.status(500).json({ message: 'Storage provider error' });
+      }
     }
 
-    const newFile = await EncryptedFile.create({
+    const fileData = {
       owner: req.user._id,
       fileName,
+      originalName: fileName,
       fileType,
       fileUrl: fileType === 'file' ? fileUrl : undefined,
       encryptedContent: fileType === 'message' ? encryptedContent : undefined,
       mimeType,
-      size,
+      size: size ? Number(size) : undefined,
       iv,
       salt,
-    });
+    };
+
+    const newFile = await EncryptedFile.create(fileData);
 
     await ActivityLog.create({
       user: req.user._id,
@@ -55,8 +64,8 @@ const uploadFile = async (req, res) => {
 
     res.status(201).json(newFile);
   } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ message: 'Server error during upload' });
+    console.error('Upload error details:', error);
+    res.status(500).json({ message: error.message || 'Server error during upload' });
   }
 };
 
