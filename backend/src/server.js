@@ -10,7 +10,23 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 
+// Database Connection Logic
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ciphervault';
+const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) return;
+  try {
+    await mongoose.connect(MONGODB_URI);
+    console.log('Connected to MongoDB');
+  } catch (err) {
+    console.error('Database connection error:', err.message);
+  }
+};
+
 // Middleware
+app.use(async (req, res, next) => {
+  await connectDB();
+  next();
+});
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use(cookieParser());
@@ -37,19 +53,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!', error: err.message });
 });
 
-// Database Connection
+// For local development
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ciphervault';
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+    connectDB();
+  });
+}
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  
-  mongoose.connect(MONGODB_URI)
-    .then(() => {
-      console.log('Connected to MongoDB');
-    })
-    .catch((err) => {
-      console.error('Database connection error:', err.message);
-      console.warn('The application will run but database operations will fail.');
-    });
-});
+// Export for Vercel serverless functions
+module.exports = app;
