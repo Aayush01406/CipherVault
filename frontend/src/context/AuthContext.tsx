@@ -16,29 +16,69 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>({
-    uid: 'mock-user-id',
-    email: 'testuser@example.com',
-    displayName: 'Test User',
-    photoURL: 'https://via.placeholder.com/150',
-  } as any);
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Authentication disabled for testing
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      const sessionLock = localStorage.getItem("sessionLock") === "true";
+      if (!sessionLock) return;
+
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      // 15 minutes = 15 * 60 * 1000 ms
+      timeoutId = setTimeout(() => {
+        logout();
+        toast("Session locked due to inactivity", { icon: "🔒" });
+      }, 15 * 60 * 1000);
+    };
+
+    // Events to track activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => document.addEventListener(event, resetTimer));
+
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => document.removeEventListener(event, resetTimer));
+    };
+  }, [user]);
+
   const signInWithGoogle = async () => {
-    toast.success("Testing mode: Already signed in as Test User");
+    try {
+      await signInWithPopup(auth, googleProvider);
+      toast.success("Welcome to CipherVault!");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to sign in");
+    }
   };
 
   const logout = async () => {
-    toast.error("Testing mode: Logout disabled");
+    try {
+      await signOut(auth);
+      toast.success("Logged out successfully");
+    } catch (error: any) {
+      toast.error("Logout failed");
+    }
   };
 
   const getToken = async () => {
-    return "mock-token";
+    if (!user) return null;
+    return await user.getIdToken();
   };
 
   return (

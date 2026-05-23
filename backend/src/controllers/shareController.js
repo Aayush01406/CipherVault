@@ -12,22 +12,9 @@ const createShareLink = async (req, res) => {
   try {
     const { fileId, password, expiresAt, oneTimeDownload } = req.body;
     
-    if (mongoose.connection.readyState !== 1) {
-      const shareId = crypto.randomBytes(16).toString('hex');
-      // We need to find the file from mockFiles in fileController
-      // For simplicity in mock mode, we'll assume it exists if the ID starts with mock-
-      const mockShare = {
-        _id: 'mock-share-' + Date.now(),
-        shareId,
-        encryptedFile: fileId, // In mock mode this is just the ID string
-        password, // Store plain password for mock verification
-        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-        oneTimeDownload,
-        downloadCount: 0,
-        createdAt: new Date(),
-      };
-      mockShares.push(mockShare);
-      return res.status(201).json(mockShare);
+    const file = await EncryptedFile.findOne({ _id: fileId, owner: req.user._id });
+    if (!file) {
+      return res.status(404).json({ message: 'File not found' });
     }
 
     let passwordHash = undefined;
@@ -60,24 +47,6 @@ const getShareLinkData = async (req, res) => {
   try {
     const { shareId } = req.params;
 
-    if (mongoose.connection.readyState !== 1) {
-      const shareLink = mockShares.find(s => s.shareId === shareId);
-      if (!shareLink) return res.status(404).json({ message: 'Share link not found' });
-      
-      // In mock mode, we need to return some file metadata too
-      return res.json({
-        ...shareLink,
-        requiresPassword: !!shareLink.password,
-        encryptedFile: {
-          fileName: 'Secure Mock File.enc',
-          fileType: 'file',
-          mimeType: 'application/octet-stream',
-          salt: '1234567890123456',
-          iv: '123456789012'
-        }
-      });
-    }
-
     const shareLink = await ShareLink.findOne({ shareId }).populate('encryptedFile');
 
     if (!shareLink) {
@@ -106,27 +75,6 @@ const getShareLinkData = async (req, res) => {
 const verifySharePassword = async (req, res) => {
   try {
     const { shareId, password } = req.body;
-
-    if (mongoose.connection.readyState !== 1) {
-      const shareLink = mockShares.find(s => s.shareId === shareId);
-      if (!shareLink) return res.status(404).json({ message: 'Share link not found' });
-      
-      if (shareLink.password && shareLink.password !== password) {
-        return res.status(401).json({ message: 'Incorrect password' });
-      }
-
-      return res.json({
-        message: 'Verified',
-        encryptedFile: {
-          fileName: 'Secure Mock File.enc',
-          fileType: 'file',
-          mimeType: 'application/octet-stream',
-          salt: '1234567890123456',
-          iv: '123456789012',
-          fileUrl: 'data:application/octet-stream;base64,dGVzdA==' // Mock content
-        }
-      });
-    }
 
     const shareLink = await ShareLink.findOne({ shareId }).populate('encryptedFile');
 

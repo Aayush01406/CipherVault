@@ -34,35 +34,38 @@ if (!admin.apps.length) {
 
 const authMiddleware = async (req, res, next) => {
   try {
-    // For development/testing: Always use mock user if not properly configured
-    const isMockMode = mongoose.connection.readyState !== 1 || !process.env.FIREBASE_PROJECT_ID;
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Unauthorized: No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
     
-    if (isMockMode) {
-      req.user = {
-        _id: 'mock-user-id',
-        googleId: 'mock-user-id',
-        email: 'testuser@example.com',
-        displayName: 'Test User',
-      };
+    // For development/testing: Allow mock-token ONLY IF Firebase Admin is not initialized
+    if (token === 'mock-token' && !admin.apps.length) {
+      req.user = { _id: 'mock-user-id', googleId: 'mock-user-id', email: 'testuser@example.com', displayName: 'Test User' };
       return next();
     }
 
-    let user = await User.findOne({ googleId: 'mock-user-id' });
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const { uid, email, name, picture } = decodedToken;
+
+    let user = await User.findOne({ googleId: uid });
 
     if (!user) {
       user = await User.create({
-        googleId: 'mock-user-id',
-        email: 'testuser@example.com',
-        displayName: 'Test User',
-        photoURL: 'https://via.placeholder.com/150',
+        googleId: uid,
+        email,
+        displayName: name,
+        photoURL: picture,
       });
     }
 
     req.user = user;
     next();
   } catch (error) {
-    console.error('Auth middleware bypass error:', error);
-    return res.status(500).json({ message: 'Internal server error in test auth bypass' });
+    console.error('Auth middleware error:', error);
+    return res.status(401).json({ message: 'Unauthorized: Invalid token' });
   }
 };
 

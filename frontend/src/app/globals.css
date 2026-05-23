@@ -19,6 +19,12 @@
 }
 
 :root {
+  --foreground-rgb: 15, 23, 42;
+  --background-start-rgb: 255, 255, 255;
+  --background-end-rgb: 248, 250, 252;
+}
+
+.dark {
   --foreground-rgb: 248, 250, 252;
   --background-start-rgb: 2, 4, 12;
   --background-end-rgb: 2, 4, 12;
@@ -33,11 +39,11 @@ body {
 }
 
 @utility glass-card {
-  @apply bg-slate-900/40 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.4)];
+  @apply bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-lg dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)];
 }
 
 @utility glass-card-hover {
-  @apply hover:border-indigo-500/40 hover:bg-slate-900/60 transition-all duration-500 hover:shadow-indigo-500/10;
+  @apply hover:border-indigo-500/40 hover:bg-white/80 dark:hover:bg-slate-900/60 transition-all duration-500 hover:shadow-indigo-500/10;
 }
 
 @utility premium-gradient-text {

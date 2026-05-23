@@ -7,35 +7,11 @@ const mongoose = require('mongoose');
 let mockFiles = [];
 
 const uploadFile = async (req, res) => {
-  console.log('--- NEW UPLOAD REQUEST ---');
-  console.log('Body:', { ...req.body, encryptedContent: req.body.encryptedContent ? '(truncated)' : undefined });
-  console.log('File:', req.file ? { name: req.file.originalname, size: req.file.size } : 'No file');
   try {
     const { fileName, fileType, encryptedContent, iv, salt, mimeType, size } = req.body;
-    console.log('Incoming upload request:', { fileName, fileType, iv, salt, hasFile: !!req.file });
 
     if (!iv || !salt) {
-      console.error('Missing encryption metadata (IV or Salt) in request body');
-    }
-
-    if (mongoose.connection.readyState !== 1) {
-      console.warn('Database not connected. Mocking successful upload for testing.');
-      const mockFile = {
-        _id: 'mock-file-id-' + Date.now(),
-        owner: req.user._id,
-        fileName,
-        fileType,
-        encryptedContent: fileType === 'file' && req.file ? req.file.buffer.toString('base64') : encryptedContent,
-        fileUrl: fileType === 'file' && req.file ? `data:${mimeType};base64,${req.file.buffer.toString('base64')}` : undefined,
-        iv: iv || 'MISSING_IV',
-        salt: salt || 'MISSING_SALT',
-        mimeType,
-        size: parseInt(size || '0'),
-        createdAt: new Date(),
-      };
-      console.log('Saved mock file with metadata:', { _id: mockFile._id, iv: mockFile.iv, salt: mockFile.salt, contentLen: mockFile.encryptedContent?.length });
-      mockFiles.push(mockFile);
-      return res.status(201).json(mockFile);
+      return res.status(400).json({ message: 'Missing encryption metadata' });
     }
 
     let fileUrl = '';
@@ -86,10 +62,6 @@ const uploadFile = async (req, res) => {
 
 const getFiles = async (req, res) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
-      console.warn('Database not connected. Returning mock files for testing.');
-      return res.json(mockFiles.filter(f => f.owner === req.user._id));
-    }
     const files = await EncryptedFile.find({ owner: req.user._id }).sort({ createdAt: -1 });
     res.json(files);
   } catch (error) {
