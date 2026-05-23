@@ -84,6 +84,11 @@ export const decryptData = async (
 
   const salt = hexToUint8Array(cleanSaltHex);
   const iv = hexToUint8Array(cleanIvHex);
+
+  if (salt.length === 0 || iv.length === 0) {
+    throw new Error('Invalid security metadata format (Salt/IV)');
+  }
+
   const key = await deriveKey(password, salt, true);
 
   // CRITICAL: Ensure we have a fresh Uint8Array view of the EXACT buffer
@@ -92,23 +97,34 @@ export const decryptData = async (
   console.log('Decryption Attempt Details:', { 
     salt: cleanSaltHex, 
     iv: cleanIvHex, 
+    saltBytes: salt.byteLength,
+    ivBytes: iv.byteLength,
     contentSize: contentUint8.byteLength,
     passwordLen: password.length,
-    first8Bytes: Array.from(contentUint8.slice(0, 8)),
-    last16Bytes: Array.from(contentUint8.slice(-16)) // This is where the GCM tag usually is
+    first8Bytes: uint8ArrayToHex(contentUint8.slice(0, 8)),
+    last16Bytes: uint8ArrayToHex(contentUint8.slice(-16)) // GCM tag
   });
 
   try {
-    // Explicitly pass the buffer to avoid any view-related issues
+    // Some browsers prefer ArrayBuffer over Uint8Array for the data parameter
+    // We'll use the buffer directly but ensured it's not sliced
     const decryptedContent = await window.crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: iv, tagLength: 128 },
       key,
-      contentUint8.buffer
+      encryptedContent
     );
     return decryptedContent;
-  } catch (error) {
-    console.error('SubtleCrypto Decrypt Error Details:', error);
-    throw new Error('Decryption failed. This usually means the password, salt, or IV is incorrect, or the file is corrupted.');
+  } catch (error: any) {
+    console.error('SubtleCrypto Decrypt Error Details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      saltSize: salt.byteLength,
+      ivSize: iv.byteLength,
+      contentSize: encryptedContent.byteLength,
+      keyAlgorithm: JSON.stringify(key.algorithm),
+    });
+    throw new Error(`Decryption failed (${error.name}). This usually means the password, salt, or IV is incorrect, or the file is corrupted.`);
   }
 };
 
@@ -122,10 +138,13 @@ export const hexToUint8Array = (hex: string) => {
   // Remove any non-hex characters (spaces, colons, etc.)
   const cleanHex = hex.replace(/[^0-9a-fA-F]/g, '');
   if (cleanHex.length % 2 !== 0) {
-    console.warn('Hex string has odd length, might be truncated');
+    console.warn('Hex string has odd length:', cleanHex.length);
   }
   const matches = cleanHex.match(/.{1,2}/g);
-  if (!matches) return new Uint8Array(0);
+  if (!matches) {
+    console.error('Failed to parse hex string:', hex);
+    return new Uint8Array(0);
+  }
   return new Uint8Array(matches.map((byte) => parseInt(byte, 16)));
 };
 

@@ -22,20 +22,31 @@ const uploadFile = async (req, res) => {
       }
 
       try {
+        console.log(`Uploading encrypted file to Cloudinary: ${fileName} (${req.file.size} bytes)`);
         const result = await new Promise((resolve, reject) => {
           const uploadStream = cloudinary.uploader.upload_stream(
-            { resource_type: 'auto', folder: 'ciphervault' },
+            { 
+              resource_type: 'raw', // Always use 'raw' for encrypted data to avoid processing errors
+              folder: 'ciphervault',
+              public_id: `${Date.now()}-${fileName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`
+            },
             (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
+              if (error) {
+                console.error('Cloudinary Upload Stream Error:', error);
+                reject(error);
+              } else resolve(result);
             }
           );
           uploadStream.end(req.file.buffer);
         });
         fileUrl = result.secure_url;
+        console.log('Cloudinary upload successful:', fileUrl);
       } catch (cloudinaryError) {
-        console.error('Cloudinary error:', cloudinaryError);
-        return res.status(500).json({ message: 'Storage provider error' });
+        console.error('Detailed Cloudinary error:', cloudinaryError);
+        return res.status(500).json({ 
+          message: 'Storage provider error', 
+          error: cloudinaryError.message 
+        });
       }
     }
 
@@ -89,10 +100,21 @@ const deleteFile = async (req, res) => {
       return res.status(404).json({ message: 'File not found' });
     }
 
-    // If it's a file, delete from Cloudinary (need to extract public_id)
+    // If it's a file, delete from Cloudinary
     if (file.fileType === 'file' && file.fileUrl) {
-      const publicId = file.fileUrl.split('/').pop().split('.')[0];
-      await cloudinary.uploader.destroy(`ciphervault/${publicId}`);
+      try {
+        // Extract public_id from Cloudinary URL
+        // Example URL: https://res.cloudinary.com/cloudname/raw/upload/v1234567/ciphervault/filename
+        const urlParts = file.fileUrl.split('/');
+        const fileNameWithExt = urlParts[urlParts.length - 1];
+        const publicId = `ciphervault/${fileNameWithExt}`;
+        
+        console.log(`Attempting to delete Cloudinary asset: ${publicId}`);
+        await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+      } catch (cloudinaryDeleteError) {
+        console.error('Cloudinary deletion warning:', cloudinaryDeleteError);
+        // We continue anyway to delete the record from our DB
+      }
     }
 
     await EncryptedFile.findByIdAndDelete(req.params.id);

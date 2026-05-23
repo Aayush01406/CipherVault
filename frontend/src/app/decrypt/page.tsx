@@ -152,7 +152,21 @@ export default function DecryptPage() {
             ? base64ToArrayBuffer(fileData.encryptedContent)
             : (fileData.fileUrl?.startsWith('data:') 
                 ? base64ToArrayBuffer(fileData.fileUrl.split(',')[1])
-                : await axios.get(fileData.fileUrl, { responseType: 'arraybuffer' }).then(res => res.data)
+                : await axios.get(fileData.fileUrl, { 
+                    responseType: 'arraybuffer',
+                    // Crucial: Don't send our backend auth token to Cloudinary/External URLs
+                    transformRequest: [(data, headers) => {
+                      delete headers['Authorization'];
+                      return data;
+                    }]
+                  }).then(res => res.data)
+                  .catch(err => {
+                    console.error("File download failed:", err);
+                    if (err.response?.status === 500) {
+                      throw new Error("Storage provider returned 500. The file might be corrupted or temporarily unavailable.");
+                    }
+                    throw new Error(`Failed to download encrypted file: ${err.message}`);
+                  })
               )
           )
         : (manualType === 'file' && manualFile 
@@ -161,6 +175,16 @@ export default function DecryptPage() {
           );
 
       if (!encryptedArrayBuffer) throw new Error("Missing encrypted content");
+
+      console.log('Decryption context:', {
+        mode,
+        fileType: type,
+        fileName: name,
+        mimeType: mime,
+        salt,
+        iv,
+        contentSize: encryptedArrayBuffer.byteLength
+      });
 
       // Check for common file signatures
       const header = new Uint8Array(encryptedArrayBuffer.slice(0, 8));
@@ -195,6 +219,8 @@ export default function DecryptPage() {
         salt,
         iv
       );
+
+      toast.success("Decryption successful");
 
       // Clean filename for download
       let finalName = name;
@@ -309,7 +335,7 @@ export default function DecryptPage() {
       toast.success("Decryption successful!");
     } catch (error: any) {
       console.error("Decryption error:", error);
-      toast.error(error.message || "Decryption failed. Incorrect password?");
+      toast.error(error.message || "Decryption failed", { duration: 6000 });
     } finally {
       setIsDecrypting(false);
     }
@@ -331,72 +357,66 @@ export default function DecryptPage() {
 
   if (loading || isFetching) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#02040c]">
-        <div className="relative">
-          <div className="w-20 h-20 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Shield className="w-8 h-8 text-indigo-500 animate-pulse" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative flex items-center justify-center">
+            <div className="w-20 h-20 border-4 border-white/5 border-t-primary rounded-full animate-spin" />
+            <div className="absolute">
+              <Shield className="w-8 h-8 text-primary animate-pulse" />
+            </div>
           </div>
+          <p className="text-text-muted font-bold uppercase tracking-widest text-[10px]">Loading Secure Context...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#02040c] text-slate-200 selection:bg-indigo-500/30">
+    <div className="flex flex-col min-h-screen bg-background text-primary selection:bg-white/10">
       <Navbar />
       
-      {/* Background decoration */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/10 blur-[120px] animate-blob" />
-        <div className="absolute bottom-[10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-600/10 blur-[120px] animate-blob animation-delay-2000" />
-        
-        {/* Grid Pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-      </div>
-
       <main className="flex-1 pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full">
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-16"
         >
           <button 
             onClick={() => router.push(fileId ? '/dashboard' : '/')}
-            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-indigo-400 transition-all mb-8 group uppercase tracking-widest"
+            className="flex items-center gap-2 text-sm font-bold text-text-muted hover:text-primary transition-colors mb-8 group uppercase tracking-widest"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to {fileId ? 'Vault' : 'Home'}
+            {fileId ? 'Command Center' : 'Home'}
           </button>
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 text-left">
             <div>
               <div className="flex items-center space-x-3 mb-4">
-                <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-                  <Key className="w-5 h-5 text-indigo-400" />
+                <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                  <Key className="w-4 h-4 text-primary" />
                 </div>
-                <span className="text-sm font-bold uppercase tracking-widest text-indigo-400/80">Decryption Portal</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Decryption Portal</span>
               </div>
-              <h1 className="text-5xl font-bold tracking-tight mb-4">
-                Unlock <span className="premium-gradient-text">Anything</span>
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-primary">
+                Unlock Secure Asset
               </h1>
-              <p className="text-slate-400 max-w-xl text-lg leading-relaxed">
-                Restore any file—Office docs, ZIP archives, or Images—to its original state instantly with your secure password.
+              <p className="text-text-secondary max-w-xl text-base leading-relaxed">
+                Client-side cryptographic restoration of binary blobs and string payloads. Raw data is never transmitted.
               </p>
             </div>
             {!decryptedContent && (
-              <div className="flex p-1.5 bg-slate-900/40 border border-white/5 rounded-2xl backdrop-blur-xl">
+              <div className="flex p-1 bg-surface border border-white/5 rounded-2xl">
                 <button
                   onClick={() => setMode('vault')}
-                  className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${
-                    mode === 'vault' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-300'
+                  className={`px-6 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-widest ${
+                    mode === 'vault' ? 'bg-white/10 text-primary' : 'text-text-muted hover:text-primary'
                   }`}
                 >
                   Vault
                 </button>
                 <button
                   onClick={() => setMode('manual')}
-                  className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${
-                    mode === 'manual' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-300'
+                  className={`px-6 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-widest ${
+                    mode === 'manual' ? 'bg-white/10 text-primary' : 'text-text-muted hover:text-primary'
                   }`}
                 >
                   Manual
@@ -406,216 +426,200 @@ export default function DecryptPage() {
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           <div className="lg:col-span-8">
             <AnimatePresence mode="wait">
               {decryptedContent ? (
               <motion.div
                 key="result"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="glass-card rounded-[2.5rem] p-10 md:p-14 relative overflow-hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="glass-card p-12 md:p-16 relative overflow-hidden"
               >
-                <div className="absolute top-0 right-0 p-12 opacity-5">
-                  <CheckCircle2 className="w-48 h-48 text-indigo-500" />
-                </div>
-
-                <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-12 relative z-10">
-                    <motion.div 
-                      initial={{ scale: 0, rotate: -20 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: "spring", duration: 0.6, delay: 0.1 }}
-                      className="professional-icon-container bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/10"
-                    >
-                      <Shield className="w-10 h-10 md:w-12 md:h-12" />
-                    </motion.div>
-                    <div className="text-center md:text-left">
-                    <h2 className="text-4xl font-bold mb-3">Decryption Complete</h2>
-                    <p className="text-slate-400 text-lg leading-relaxed">
-                      Your asset has been successfully decrypted. You can now view or download the original content.
+                <div className="flex flex-col md:flex-row items-center md:items-start gap-10 mb-16 relative z-10 text-left">
+                    <div className="w-16 h-16 rounded-full bg-security/10 text-security border border-security/20 flex items-center justify-center shrink-0">
+                      <Shield className="w-8 h-8" />
+                    </div>
+                    <div>
+                    <h2 className="text-3xl font-bold mb-3 tracking-tight">Decryption Success</h2>
+                    <p className="text-text-secondary text-base leading-relaxed max-w-md">
+                      Asset has been successfully restored to its original state within the browser context.
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-6 relative z-10">
+                <div className="space-y-8 relative z-10 text-left">
                   {fileData.fileType === 'message' ? (
                     <div className="space-y-4">
-                      <label className="text-sm font-bold text-slate-500 uppercase tracking-widest px-1">Decrypted Message</label>
-                      <div className="p-8 rounded-[2rem] bg-slate-950/50 border border-white/5 font-mono text-lg leading-relaxed text-indigo-200">
+                      <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest px-2">Original Content</label>
+                      <div className="p-8 rounded-3xl bg-background border border-white/5 font-mono text-lg leading-relaxed text-primary/90">
                         {decryptedContent}
                       </div>
-                      <Button 
+                      <button 
                         onClick={() => {
                           navigator.clipboard.writeText(decryptedContent);
-                          toast.success("Message copied!");
+                          toast.success("Copied");
                         }}
-                        variant="outline"
-                        className="w-full h-14 rounded-2xl border-white/5 bg-white/5 text-slate-200 hover:bg-white/10 text-lg font-bold gap-3"
+                        className="secondary-button w-full h-14 text-base"
                       >
                         <Copy className="w-5 h-5" />
-                        Copy Message
-                      </Button>
+                        Copy to Clipboard
+                      </button>
                     </div>
                   ) : (
-                    <div className="space-y-6">
-                          <div className="flex flex-col sm:flex-row items-center justify-between p-6 md:p-8 rounded-[2.5rem] bg-white/[0.03] border border-white/10 gap-8 shadow-2xl relative group">
-                            <div className="absolute inset-0 bg-indigo-500/5 rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="flex items-center gap-6 min-w-0 relative z-10">
-                              <div className="w-16 h-16 md:w-20 md:h-20 rounded-[1.5rem] bg-indigo-500/10 flex items-center justify-center text-indigo-400 flex-shrink-0 shadow-inner">
-                                <FileText className="w-8 h-8 md:w-10 md:h-10" />
+                    <div className="space-y-8">
+                          <div className="flex flex-col sm:flex-row items-center justify-between p-8 rounded-3xl bg-white/[0.01] border border-white/5 gap-10 group">
+                            <div className="flex items-center gap-6 min-w-0">
+                              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-primary flex-shrink-0">
+                                <FileText className="w-8 h-8" />
                               </div>
-                              <div className="min-w-0">
-                                <h3 className="font-bold text-xl md:text-2xl text-white truncate mb-1">{fileData.fileName}</h3>
-                                <p className="text-slate-500 text-xs md:text-sm uppercase tracking-[0.2em] font-black truncate">{fileData.mimeType}</p>
+                              <div className="min-w-0 text-left">
+                                <h3 className="font-bold text-xl text-primary truncate mb-1">{fileData.fileName}</h3>
+                                <p className="text-text-muted text-[10px] uppercase tracking-widest font-bold truncate">{fileData.mimeType}</p>
                               </div>
                             </div>
-                            <Button 
+                            <button 
                               onClick={downloadFile}
-                              className="w-full sm:w-auto h-14 md:h-16 px-10 rounded-2xl bg-indigo-500 hover:bg-indigo-400 text-white text-lg font-bold gap-3 flex-shrink-0 shadow-2xl shadow-indigo-500/20 active:scale-95 transition-all relative z-10"
+                              className="primary-button w-full sm:w-auto h-14 px-10 text-base"
                             >
-                              <Download className="w-6 h-6" />
-                              <span className="whitespace-nowrap">Download File</span>
-                            </Button>
+                              <Download className="w-5 h-5" />
+                              Download
+                            </button>
                           </div>
 
                       {decryptedPreviewUrl && (
-                        <div className="rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl">
-                          <img src={decryptedPreviewUrl} alt="Preview" className="w-full h-auto max-h-[500px] object-contain bg-slate-950/50 p-4" />
+                        <div className="rounded-3xl overflow-hidden border border-white/5 bg-background p-4">
+                          <img src={decryptedPreviewUrl} alt="Preview" className="w-full h-auto max-h-[600px] object-contain rounded-xl" />
                         </div>
                       )}
                     </div>
                   )}
 
-                  <div className="flex flex-col md:flex-row gap-4 pt-4">
-                    <Button 
-                      onClick={() => router.push('/dashboard')}
-                      variant="outline"
-                      className="w-full md:flex-1 h-14 rounded-2xl border-white/5 bg-white/5 text-slate-200 hover:bg-white/10 text-lg font-bold active:scale-[0.98] transition-all"
-                    >
-                      Return to Vault
-                    </Button>
-                    <Button 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
+                    <button onClick={() => router.push('/dashboard')} className="secondary-button h-14">
+                      Return to Command Center
+                    </button>
+                    <button 
                       onClick={() => {
                         setDecryptedContent(null);
                         setDecryptedPreviewUrl(null);
                         setPassword('');
                       }}
-                      className="w-full md:flex-1 h-14 rounded-2xl premium-button text-lg font-bold active:scale-[0.98] transition-all"
+                      className="primary-button h-14"
                     >
-                      Decrypt Another
-                    </Button>
+                      Process Another
+                    </button>
                   </div>
                 </div>
               </motion.div>
             ) : mode === 'share' && !fileData ? (
               <motion.div
                 key="share-auth"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass-card rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden text-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="glass-card p-12 text-center"
               >
-                <div className="professional-icon-container bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/10 mx-auto mb-8">
-                  <Lock className="w-10 h-10 md:w-12 md:h-12" />
+                <div className="w-16 h-16 bg-white/5 border border-white/10 mx-auto mb-8 rounded-2xl flex items-center justify-center">
+                  <Lock className="w-8 h-8 text-primary" />
                 </div>
-                <h2 className="text-3xl font-bold mb-4">Link Protected</h2>
-                <p className="text-slate-400 mb-8 max-w-sm mx-auto">This share link requires a password to access the encrypted metadata.</p>
+                <h2 className="text-2xl font-bold mb-3 tracking-tight text-primary">Protected Resource</h2>
+                <p className="text-text-secondary mb-10 max-w-sm mx-auto text-sm">Authentication is required to access metadata for this share link.</p>
                 
                 <form onSubmit={verifyShare} className="space-y-6 max-w-sm mx-auto">
                   <input 
                     type="password"
-                    placeholder="Enter link password"
+                    placeholder="Link password"
                     value={sharePassword}
                     onChange={(e) => setSharePassword(e.target.value)}
-                    className="premium-input h-14 rounded-2xl px-6 text-center text-lg"
+                    className="enterprise-input text-center text-lg"
                     required
                   />
-                  <Button 
+                  <button 
                     type="submit" 
-                    isLoading={isVerifyingShare}
-                    className="w-full h-14 rounded-2xl premium-button text-lg gap-2"
+                    className="primary-button w-full h-12"
+                    disabled={isVerifyingShare}
                   >
-                    Access Link
-                    <ChevronRight className="w-5 h-5" />
-                  </Button>
+                    {isVerifyingShare ? 'Authenticating...' : 'Access Resource'}
+                  </button>
                 </form>
               </motion.div>
             ) : (
                 <motion.div
                   key="form"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="glass-card rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="glass-card p-10 md:p-12 relative overflow-hidden text-left"
                 >
-                  <div className="glass-card rounded-3xl p-8 md:p-10">
+                  <div className="space-y-10">
                     {(mode === 'vault' || mode === 'share') && fileData ? (
-                      <div className="p-8 rounded-[2rem] bg-indigo-500/5 border border-indigo-500/10 flex items-center gap-6 mb-8">
-                        <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 shadow-inner">
+                      <div className="p-8 rounded-3xl bg-primary/[0.02] border border-border-subtle flex items-center gap-6 mb-10">
+                        <div className="w-16 h-16 rounded-2xl bg-primary/5 border border-border-subtle flex items-center justify-center text-primary">
                           {fileData?.fileType === 'file' ? <FileText className="w-8 h-8" /> : <MessageSquare className="w-8 h-8" />}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-2xl font-bold text-white truncate pr-4">{fileData?.fileName || 'Loading asset...'}</h3>
-                          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs mt-1">Ready for decryption</p>
+                          <h3 className="text-2xl font-bold text-primary truncate pr-6 tracking-tight">{fileData?.fileName || 'Asset ID: ' + fileId}</h3>
+                          <p className="text-text-muted font-bold uppercase tracking-widest text-[10px] mt-1">Resource Authenticated</p>
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-8">
-                        <div className="flex gap-4 p-1 bg-slate-950 rounded-xl border border-slate-800 w-fit">
+                      <div className="space-y-10">
+                        <div className="flex gap-4 p-1 bg-surface border border-border-subtle rounded-2xl w-fit">
                           <button 
                             onClick={() => setManualType('message')}
-                            className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${manualType === 'message' ? 'bg-slate-800 text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                            className={`px-8 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${manualType === 'message' ? 'bg-primary/10 text-primary' : 'text-text-muted hover:text-primary'}`}
                           >
-                            Secret Message
+                            String
                           </button>
                           <button 
                             onClick={() => setManualType('file')}
-                            className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${manualType === 'file' ? 'bg-slate-800 text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                            className={`px-8 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${manualType === 'file' ? 'bg-primary/10 text-primary' : 'text-text-muted hover:text-primary'}`}
                           >
-                            Encrypted File
+                            Binary
                           </button>
                         </div>
 
                         {manualType === 'message' ? (
-                          <div className="space-y-4">
-                            <label className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Encrypted Ciphertext</label>
+                          <div className="space-y-3">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted px-1">Ciphertext Payload</label>
                             <textarea
                               value={manualContent}
                               onChange={(e) => setManualContent(e.target.value)}
-                              placeholder="Paste the encrypted base64 payload here..."
-                              className="enterprise-input min-h-[200px] resize-none font-mono text-sm leading-relaxed"
+                              placeholder="Base64 encoded ciphertext..."
+                              className="enterprise-input min-h-[220px] resize-none font-mono text-sm leading-relaxed"
                             />
                           </div>
                         ) : (
-                          <div className="space-y-4">
-                            <label className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Encrypted Archive (.enc)</label>
+                          <div className="space-y-3">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted px-1">Encrypted Archive (.enc)</label>
                             <div 
                               onClick={() => fileInputRef.current?.click()}
-                              className="group border-2 border-dashed border-white/10 rounded-2xl p-16 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/40 hover:bg-blue-500/5 transition-all relative overflow-hidden"
+                              className="group border-2 border-dashed border-border-subtle rounded-3xl p-20 flex flex-col items-center justify-center cursor-pointer hover:border-security/30 hover:bg-primary/[0.01] transition-all"
                             >
                               <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => setManualFile(e.target.files?.[0] || null)} />
                               {manualFile ? (
                                 <div className="flex flex-col items-center">
-                                  <div className="w-20 h-20 bg-blue-600/10 text-blue-400 rounded-3xl flex items-center justify-center mb-6 border border-blue-600/20 shadow-lg shadow-blue-900/20">
-                                    <FileText className="w-10 h-10" />
+                                  <div className="w-16 h-16 bg-primary/5 text-primary rounded-2xl flex items-center justify-center mb-6 border border-border-subtle">
+                                    <FileText className="w-8 h-8" />
                                   </div>
-                                  <div className="text-white font-bold text-xl mb-1">{manualFile.name}</div>
-                                  <div className="text-slate-500 text-xs uppercase tracking-widest font-black">{(manualFile.size / 1024).toFixed(1)} KB ARCHIVE</div>
+                                  <div className="text-primary font-bold text-xl mb-1">{manualFile.name}</div>
+                                  <div className="text-text-muted text-[10px] uppercase tracking-widest font-bold">{(manualFile.size / 1024).toFixed(1)} KB</div>
                                 </div>
                               ) : (
                                 <>
-                                  <div className="w-16 h-16 bg-white/5 text-slate-600 rounded-2xl flex items-center justify-center mb-6 group-hover:text-blue-400 transition-colors border border-white/10">
-                                    <Upload className="w-8 h-8" />
+                                  <div className="w-12 h-12 bg-primary/5 text-text-muted rounded-xl flex items-center justify-center mb-6 border border-border-subtle">
+                                    <Upload className="w-6 h-6" />
                                   </div>
-                                  <span className="text-slate-300 font-bold text-lg">Load Encrypted Asset</span>
-                                  <span className="text-slate-500 text-sm mt-2">Select from local terminal or drag-and-drop</span>
+                                  <span className="text-primary font-bold text-lg mb-1">Load binary asset</span>
+                                  <span className="text-text-muted text-xs font-medium">Terminal drop or browse</span>
                                 </>
                               )}
                             </div>
                           </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-6 items-end">
+                        <div className="grid grid-cols-2 gap-8 items-end">
                           <div className="space-y-3">
-                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 block whitespace-nowrap">Encryption Salt</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted block whitespace-nowrap px-1">Salt</label>
                             <input
                               type="text"
                               value={manualSalt}
@@ -625,7 +629,7 @@ export default function DecryptPage() {
                             />
                           </div>
                           <div className="space-y-3">
-                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 block whitespace-nowrap">Initialization Vector</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted block whitespace-nowrap px-1">Vector (IV)</label>
                             <input
                               type="text"
                               value={manualIv}
@@ -638,76 +642,73 @@ export default function DecryptPage() {
                       </div>
                     )}
 
-                    <form onSubmit={handleDecrypt} className="mt-12 pt-12 border-t border-white/5 space-y-10">
-                      <div className="space-y-4">
-                        <label className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Master Authentication Key</label>
+                    <form onSubmit={handleDecrypt} className="mt-16 pt-16 border-t border-border-subtle space-y-12">
+                      <div className="space-y-6">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted px-2">Master Key</label>
                         <div className="relative group">
-                          <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-blue-500 transition-colors">
-                            <Lock className="w-5 h-5" />
-                          </div>
-                          <input
+                          <input 
                             type={showPassword ? "text" : "password"}
+                            placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter the secret key used during asset encryption"
-                            className="enterprise-input pl-14 pr-14 py-4 text-lg"
+                            className="enterprise-input h-16 text-xl tracking-[0.2em] pr-16"
+                            required
                           />
-                          <button
+                          <button 
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute inset-y-0 right-0 pr-5 flex items-center text-slate-500 hover:text-white transition-all"
+                            className="absolute inset-y-0 right-0 pr-6 flex items-center text-text-muted hover:text-primary transition-all"
                           >
                             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                           </button>
                         </div>
                       </div>
 
-                      <div className="flex flex-col md:flex-row gap-4">
-                        <Button 
-                          type="submit" 
-                          className="premium-button w-full md:flex-1 h-14 text-lg active:scale-[0.98] transition-all" 
-                          isLoading={isDecrypting}
-                        >
-                          <RefreshCw className={`w-5 h-5 mr-3 ${isDecrypting ? 'animate-spin' : ''}`} />
-                          Decrypt Now
-                        </Button>
-                      </div>
+                      <button 
+                        type="submit"
+                        disabled={isDecrypting || !password}
+                        className="primary-button w-full h-16 text-lg group overflow-hidden relative"
+                      >
+                        <div className="relative z-10 flex items-center gap-3">
+                          {isDecrypting ? (
+                            <div className="w-5 h-5 border-2 border-background/30 border-t-background rounded-full animate-spin" />
+                          ) : (
+                            <Shield className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                          )}
+                          {isDecrypting ? 'Processing Cipher...' : 'Execute Decryption'}
+                        </div>
+                      </button>
 
                       {diagnostics && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-5 rounded-2xl bg-slate-950/50 border border-slate-800/50 font-mono text-[11px] text-slate-500 space-y-2"
-                        >
-                          <div className="flex justify-between border-b border-slate-900 pb-2">
-                            <span className="text-slate-600">PROTOCOL</span>
-                            <span className="text-indigo-400 font-bold tracking-widest">AES-256-GCM</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>MODE / TYPE</span>
-                            <span className="text-slate-300">{mode.toUpperCase()} / {diagnostics.type.toUpperCase()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>PAYLOAD SIZE</span>
-                            <span className="text-slate-300">{diagnostics.size.toLocaleString()} BYTES</span>
-                          </div>
-                          {diagnostics.signature && (
-                            <div className="flex justify-between text-amber-500/80 pt-1">
-                              <span>DETECTED FORMAT</span>
-                              <span className="font-bold">{diagnostics.signature.toUpperCase()}</span>
+                        <div className="space-y-6">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted px-2">Runtime Evidence</label>
+                          <div className="p-8 rounded-3xl bg-background border border-border-subtle font-mono text-[11px] text-text-muted space-y-4">
+                            <div className="flex justify-between border-b border-border-subtle pb-4">
+                              <span>PROTOCOL</span>
+                              <span className="text-primary font-bold tracking-widest">AES-256-GCM</span>
                             </div>
-                          )}
-                        </motion.div>
+                            <div className="flex justify-between">
+                              <span>PAYLOAD WEIGHT</span>
+                              <span className="text-primary font-bold">{diagnostics.size.toLocaleString()} BYTES</span>
+                            </div>
+                            {diagnostics.signature && (
+                              <div className="flex justify-between text-security pt-2 border-t border-border-subtle">
+                                <span>MIME SIGNATURE</span>
+                                <span className="font-bold">{diagnostics.signature.toUpperCase()}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </form>
                   </div>
 
-                  <div className="glass-card rounded-2xl p-5 border-amber-500/10 flex gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-                      <AlertCircle className="w-5 h-5 text-amber-500" />
+                  <div className="mt-12 p-8 rounded-3xl bg-primary/5 border border-border-subtle flex gap-6 items-center">
+                    <div className="w-12 h-12 rounded-2xl bg-security/10 flex items-center justify-center text-security flex-shrink-0">
+                      <Shield className="w-6 h-6" />
                     </div>
-                    <p className="text-sm text-slate-400 leading-relaxed">
-                      <strong className="text-amber-500/90">Privacy Protocol:</strong> Decryption is processed entirely in your browser's secure memory. Your password and raw data are never transmitted over the network.
+                    <p className="text-xs text-text-secondary leading-relaxed">
+                      Restoration is processed in the browser&apos;s secure context. Your master key and raw data are never transmitted over the network.
                     </p>
                   </div>
                 </motion.div>
@@ -715,53 +716,45 @@ export default function DecryptPage() {
             </AnimatePresence>
           </div>
 
-          <div className="lg:col-span-4 space-y-8">
+          <div className="lg:col-span-4 space-y-10 text-left">
             <motion.div 
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              className="glass-card rounded-[2rem] p-8 border-indigo-500/10"
+              className="glass-card p-10"
             >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-lg bg-indigo-500/10">
-                  <Shield className="w-5 h-5 text-indigo-400" />
-                </div>
-                <h3 className="font-bold text-white uppercase tracking-widest text-sm">Security Policy</h3>
+              <div className="flex items-center gap-4 mb-8 border-b border-border-subtle pb-6">
+                <Shield className="w-5 h-5 text-security" />
+                <h3 className="font-bold text-primary uppercase tracking-widest text-xs">Security Policy</h3>
               </div>
-              <ul className="space-y-6">
-                <li className="flex gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-500/10 flex items-center justify-center text-[10px] font-bold text-indigo-400 border border-indigo-500/20">1</div>
-                  <p className="text-sm text-slate-400 leading-relaxed"><span className="text-slate-200 font-bold">Local-Only:</span> Your password never leaves your browser.</p>
+              <ul className="space-y-8">
+                <li className="flex gap-5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/5 border border-border-subtle flex items-center justify-center text-[10px] font-bold text-primary">1</div>
+                  <p className="text-sm text-text-secondary leading-relaxed"><span className="text-primary font-bold">Client-Side:</span> Password never leaves your local context.</p>
                 </li>
-                <li className="flex gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-500/10 flex items-center justify-center text-[10px] font-bold text-indigo-400 border border-indigo-500/20">2</div>
-                  <p className="text-sm text-slate-400 leading-relaxed"><span className="text-slate-200 font-bold">AES-256-GCM:</span> We use the most secure encryption standard available.</p>
+                <li className="flex gap-5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/5 border border-border-subtle flex items-center justify-center text-[10px] font-bold text-primary">2</div>
+                  <p className="text-sm text-text-secondary leading-relaxed"><span className="text-primary font-bold">Authenticated:</span> GCM mode ensures asset integrity.</p>
                 </li>
-                <li className="flex gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-500/10 flex items-center justify-center text-[10px] font-bold text-indigo-400 border border-indigo-500/20">3</div>
-                  <p className="text-sm text-slate-400 leading-relaxed"><span className="text-slate-200 font-bold">PBKDF2:</span> Passwords are strengthened with 100k iterations.</p>
+                <li className="flex gap-5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/5 border border-border-subtle flex items-center justify-center text-[10px] font-bold text-primary">3</div>
+                  <p className="text-sm text-text-secondary leading-relaxed"><span className="text-primary font-bold">Hardened:</span> PBKDF2 with 100k+ secure iterations.</p>
                 </li>
               </ul>
             </motion.div>
 
             <motion.div 
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="glass-card rounded-[2rem] p-8 border-purple-500/10"
+              transition={{ delay: 0.1 }}
+              className="glass-card p-10"
             >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-lg bg-purple-500/10">
-                  <Info className="w-5 h-5 text-purple-400" />
-                </div>
-                <h3 className="font-bold text-white uppercase tracking-widest text-sm">Best Practices</h3>
+              <div className="flex items-center gap-4 mb-8 border-b border-border-subtle pb-6">
+                <Info className="w-5 h-5 text-text-muted" />
+                <h3 className="font-bold text-primary uppercase tracking-widest text-xs">Integrity Tip</h3>
               </div>
-              <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                For maximum security, use a unique password of at least 16 characters with a mix of symbols and numbers.
+              <p className="text-sm text-text-secondary leading-relaxed">
+                Decryption will fail if the provided salt or vector does not exactly match the values generated during provision.
               </p>
-              <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10 text-xs text-purple-300 font-medium">
-                Tip: Use a passphrase of 4-5 random words for high entropy.
-              </div>
             </motion.div>
           </div>
         </div>
