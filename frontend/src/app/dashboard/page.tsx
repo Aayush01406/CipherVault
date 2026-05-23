@@ -169,7 +169,10 @@ export default function Dashboard() {
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
-                          onClick={() => setSharingFile(file) || setIsShareModalOpen(true)} 
+                          onClick={() => {
+  setSharingFile(file);
+  setIsShareModalOpen(true);
+}} 
                           className="p-2 text-text-secondary hover:text-primary transition-colors"
                         >
                           <Share2 className="w-4 h-4" />
