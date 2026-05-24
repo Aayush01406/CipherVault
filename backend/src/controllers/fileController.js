@@ -31,11 +31,16 @@ const uploadFile = async (req, res) => {
               public_id: `${Date.now()}-${fileName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`
             },
             (error, result) => {
-              if (error) {
-                console.error('Cloudinary Upload Stream Error:', error);
-                reject(error);
-              } else resolve(result);
-            }
+  if (error) {
+    console.error(
+      'Cloudinary Upload Stream Error:',
+      JSON.stringify(error, null, 2)
+    );
+    reject(error);
+  } else {
+    resolve(result);
+  }
+}
           );
           uploadStream.end(req.file.buffer);
         });
