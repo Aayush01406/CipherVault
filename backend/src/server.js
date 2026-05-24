@@ -24,24 +24,20 @@ const connectDB = async () => {
   }
 };
 
-
-app.get('/cloudinary-upload-test', async (req, res) => {
+app.get('/cloudinary-raw-test', async (req, res) => {
   try {
     const result = await cloudinary.uploader.upload(
-      'https://res.cloudinary.com/demo/image/upload/sample.jpg'
+      'data:text/plain;base64,SGVsbG8gQ2xvdWRpbmFyeQ==',
+      {
+        resource_type: 'raw'
+      }
     );
 
-    res.json({
-      success: true,
-      url: result.secure_url
-    });
+    res.json(result);
   } catch (err) {
-    console.error('CLOUDINARY TEST FAILED:', err);
+    console.error('RAW TEST FAILED:', err);
 
-    res.status(500).json({
-      success: false,
-      error: err
-    });
+    res.status(500).json(err);
   }
 });
 
