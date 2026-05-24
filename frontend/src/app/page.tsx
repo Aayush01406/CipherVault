@@ -1,7 +1,7 @@
 "use client";
 
 import Navbar from "@/components/Navbar";
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { Shield, Lock, Share2, Eye, Download, Zap, Globe, ChevronRight, ArrowRight, CheckCircle2, Activity } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -9,22 +9,28 @@ import { useAuth } from "@/context/AuthContext";
 export default function Home() {
   const { user, signInWithGoogle } = useAuth();
 
-  const fadeIn = {
-    hidden: { opacity: 0, y: 15 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] }
+  const fadeIn: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 15,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut",
     },
-  };
+  },
+};
 
-  const stagger = {
-    visible: {
-      transition: {
-        staggerChildren: 0.1,
-      },
+  const stagger: Variants = {
+  visible: {
+    transition: {
+      staggerChildren: 0.1,
     },
-  };
+  },
+};
 
   return (
     <div className="flex flex-col min-h-screen bg-background selection:bg-primary/10">

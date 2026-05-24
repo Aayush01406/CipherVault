@@ -2,7 +2,7 @@
 
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { 
@@ -18,7 +18,7 @@ import { decryptData, base64ToArrayBuffer } from "@/utils/crypto";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-export default function DecryptPage() {
+function DecryptContent() {
   const { user, loading, getToken } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -760,5 +760,23 @@ export default function DecryptPage() {
         </div>
       </main>
     </div>
+  );
+}
+export default function DecryptPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-6">
+            <div className="w-16 h-16 border-4 border-white/5 border-t-primary rounded-full animate-spin" />
+            <p className="text-text-muted font-bold uppercase tracking-widest text-[10px]">
+              Loading...
+            </p>
+          </div>
+        </div>
+      }
+    >
+      <DecryptContent />
+    </Suspense>
   );
 }

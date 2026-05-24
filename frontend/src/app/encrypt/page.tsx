@@ -28,7 +28,13 @@ export default function EncryptPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isEncrypting, setIsEncrypting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [encryptionResult, setEncryptionResult] = useState<{ salt: string, iv: string, content: string, blob?: Blob } | null>(null);
+  const [encryptionResult, setEncryptionResult] = useState<{
+  salt: string;
+  iv: string;
+  content?: string;
+  blob?: Blob;
+  encryptedContent?: ArrayBuffer;
+} | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,7 +49,9 @@ export default function EncryptPage() {
       blob = encryptionResult.blob;
     } else {
       try {
-        const binaryString = window.atob(encryptionResult.content);
+        if (!encryptionResult.content) return;
+
+const binaryString = window.atob(encryptionResult.content);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);

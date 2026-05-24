@@ -20,7 +20,7 @@ export const deriveKey = async (password: string, salt: Uint8Array, debug = fals
   const derivedBits = await window.crypto.subtle.deriveBits(
     {
       name: 'PBKDF2',
-      salt: salt,
+      salt: salt as BufferSource,
       iterations: ITERATIONS,
       hash: 'SHA-256',
     },

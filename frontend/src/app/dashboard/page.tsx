@@ -246,11 +246,12 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <ShareModal 
-        isOpen={isShareModalOpen} 
-        onClose={() => setIsShareModalOpen(false)} 
-        file={sharingFile} 
-      />
+      <ShareModal
+  isOpen={isShareModalOpen}
+  onClose={() => setIsShareModalOpen(false)}
+  file={sharingFile}
+  getToken={getToken}
+/>
     </div>
   );
 }
