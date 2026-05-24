@@ -24,6 +24,27 @@ const connectDB = async () => {
   }
 };
 
+
+app.get('/cloudinary-upload-test', async (req, res) => {
+  try {
+    const result = await cloudinary.uploader.upload(
+      'https://res.cloudinary.com/demo/image/upload/sample.jpg'
+    );
+
+    res.json({
+      success: true,
+      url: result.secure_url
+    });
+  } catch (err) {
+    console.error('CLOUDINARY TEST FAILED:', err);
+
+    res.status(500).json({
+      success: false,
+      error: err
+    });
+  }
+});
+
 // Middleware
 app.use(async (req, res, next) => {
   await connectDB();
