@@ -55,12 +55,16 @@ app.use((err, req, res, next) => {
 
 // For local development
 const PORT = process.env.PORT || 5000;
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    connectDB();
-  });
-}
 
-// Export for Vercel serverless functions
+connectDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to connect DB:", err);
+    process.exit(1);
+  });
+
 module.exports = app;
