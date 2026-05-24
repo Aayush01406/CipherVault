@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
+const cloudinary = require('./config/cloudinary');
 
 const { apiLimiter } = require('./middleware/rateLimiter');
 
@@ -55,6 +56,15 @@ app.use((err, req, res, next) => {
 
 // For local development
 const PORT = process.env.PORT || 5000;
+
+(async () => {
+  try {
+    const result = await cloudinary.api.ping();
+    console.log('CLOUDINARY PING SUCCESS:', result);
+  } catch (err) {
+    console.error('CLOUDINARY PING FAILED:', err);
+  }
+})();
 
 connectDB()
   .then(() => {
