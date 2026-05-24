@@ -24,27 +24,28 @@ const uploadFile = async (req, res) => {
       try {
         console.log(`Uploading encrypted file to Cloudinary: ${fileName} (${req.file.size} bytes)`);
         const result = await new Promise((resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            { 
-              resource_type: 'raw', // Always use 'raw' for encrypted data to avoid processing errors
-              folder: 'ciphervault',
-              public_id: `${Date.now()}-${fileName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`
-            },
-            (error, result) => {
-              if (error) {
-  console.error('===== CLOUDINARY ERROR =====');
-  console.error(error);
-  console.error('MESSAGE:', error.message);
-  console.error('HTTP:', error.http_code);
-  console.error('FULL:', JSON.stringify(error, null, 2));
-  console.error('===========================');
+  const uploadStream = cloudinary.uploader.upload_stream(
+    {
+      resource_type: 'auto'
+    },
+    (error, result) => {
+      if (error) {
+        console.error('===== CLOUDINARY ERROR =====');
+        console.error(error);
+        console.error('MESSAGE:', error.message);
+        console.error('HTTP:', error.http_code);
+        console.error('FULL:', JSON.stringify(error, null, 2));
+        console.error('===========================');
 
-  reject(error);
-}
-            }
-          );
-          uploadStream.end(req.file.buffer);
-        });
+        reject(error);
+      } else {
+        resolve(result);
+      }
+    }
+  );
+
+  uploadStream.end(req.file.buffer);
+});
         fileUrl = result.secure_url;
         console.log('Cloudinary upload successful:', fileUrl);
       } catch (cloudinaryError) {
