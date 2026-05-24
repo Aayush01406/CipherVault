@@ -10,6 +10,7 @@ const cloudinary = require('./config/cloudinary');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Database Connection Logic
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ciphervault';

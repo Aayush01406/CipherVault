@@ -22,39 +22,29 @@ const uploadFile = async (req, res) => {
       }
 
       try {
-        console.log(`Uploading encrypted file to Cloudinary: ${fileName} (${req.file.size} bytes)`);
-        const result = await new Promise((resolve, reject) => {
-  const uploadStream = cloudinary.uploader.upload_stream(
+  console.log(
+    `Uploading encrypted file to Cloudinary: ${fileName} (${req.file.size} bytes)`
+  );
+
+  const result = await cloudinary.uploader.upload(
+    `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`,
     {
       resource_type: 'auto'
-    },
-    (error, result) => {
-      if (error) {
-        console.error('===== CLOUDINARY ERROR =====');
-        console.error(error);
-        console.error('MESSAGE:', error.message);
-        console.error('HTTP:', error.http_code);
-        console.error('FULL:', JSON.stringify(error, null, 2));
-        console.error('===========================');
-
-        reject(error);
-      } else {
-        resolve(result);
-      }
     }
   );
 
-  uploadStream.end(req.file.buffer);
-});
-        fileUrl = result.secure_url;
-        console.log('Cloudinary upload successful:', fileUrl);
-      } catch (cloudinaryError) {
-        console.error('Detailed Cloudinary error:', cloudinaryError);
-        return res.status(500).json({ 
-          message: 'Storage provider error', 
-          error: cloudinaryError.message 
-        });
-      }
+  fileUrl = result.secure_url;
+
+  console.log('Cloudinary upload successful:', fileUrl);
+
+} catch (cloudinaryError) {
+  console.error('Detailed Cloudinary error:', cloudinaryError);
+
+  return res.status(500).json({
+    message: 'Storage provider error',
+    error: cloudinaryError.message
+  });
+}
     }
 
     const fileData = {
