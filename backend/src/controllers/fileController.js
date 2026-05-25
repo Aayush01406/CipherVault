@@ -28,10 +28,27 @@ const uploadFile = async (req, res) => {
 
     if (fileType === 'file') {
       if (!req.file) {
+        
         return res.status(400).json({
           message: 'No file buffer received'
         });
       }
+      console.log("========== FILE DEBUG ==========");
+console.log(req.file);
+console.log("fieldname:", req.file.fieldname);
+console.log("originalname:", req.file.originalname);
+console.log("encoding:", req.file.encoding);
+console.log("mimetype:", req.file.mimetype);
+console.log("size:", req.file.size);
+console.log(
+  "buffer exists:",
+  !!req.file.buffer
+);
+console.log(
+  "buffer length:",
+  req.file.buffer ? req.file.buffer.length : 0
+);
+console.log("================================");
 
       try {
         console.log(
